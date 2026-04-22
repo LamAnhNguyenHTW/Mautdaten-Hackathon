@@ -2,9 +2,13 @@ node_modules
 .git
 
 # Exclude heavy raw data from deployment bundle
-Daten/*
-!Daten/geojson/
-Daten/geojson/*
-!Daten/geojson/unfaelle_berlin.json
-!Daten/geojson/unfaelle_dortmund.json
-!Daten/geojson/unfaelle_kassel.json
+Daten/*.csv
+Daten/*.xsd
+Daten/*.cpg
+Daten/*.dbf
+Daten/*.prj
+Daten/*.sbn
+Daten/*.sbx
+Daten/*.shp
+Daten/*.shx
+Daten/*.jpg
