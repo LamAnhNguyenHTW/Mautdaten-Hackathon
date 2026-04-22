@@ -1,0 +1,11 @@
+node_modules/
+.vercel/
+
+# Raw large source data (do not push)
+Daten/**
+
+# Keep only the runtime GeoJSON subset used by the app
+!Daten/geojson/
+!Daten/geojson/unfaelle_berlin.json
+!Daten/geojson/unfaelle_dortmund.json
+!Daten/geojson/unfaelle_kassel.json

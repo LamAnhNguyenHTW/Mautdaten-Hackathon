@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoToll – Intelligente Mautrouten</title>
+    <meta name="description"
+        content="EcoToll berechnet nachhaltige Routen und dynamische Mautpreise basierend auf Verkehr, Lärm, Luftqualität und mehr.">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <!-- Logo -->
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="ph ph-leaf"></i>
+            </div>
+            <div class="logo-text">
+                <h1>EcoToll</h1>
+                <span>Intelligente Mautrouten</span>
+            </div>
+            <button class="authority-login-btn" id="authorityLoginBtn" title="Behörden-Zugang">
+                <i class="ph ph-lock-key"></i>
+                <span>Verwaltung</span>
+            </button>
+        </div>
+
+        <!-- Route Input -->
+        <div class="route-input-section">
+            <div class="input-group">
+                <div class="input-icon start-icon">
+                    <i class="ph ph-circle"></i>
+                </div>
+                <div class="input-connector"></div>
+                <div class="input-icon end-icon">
+                    <i class="ph ph-map-pin"></i>
+                </div>
+                <div class="inputs-wrapper">
+                    <div class="input-field">
+                        <input type="text" id="origin" placeholder="Startort eingeben..." value="München">
+                        <button class="input-clear" onclick="document.getElementById('origin').value=''">
+                            <i class="ph ph-x"></i>
+                        </button>
+                    </div>
+                    <div class="input-divider"></div>
+                    <div class="input-field">
+                        <input type="text" id="destination" placeholder="Zielort eingeben..." value="Berlin">
+                        <button class="input-clear" onclick="document.getElementById('destination').value=''">
+                            <i class="ph ph-x"></i>
+                        </button>
+                    </div>
+                </div>
+                <button class="swap-btn" id="swapBtn" title="Start und Ziel tauschen">
+                    <i class="ph ph-arrows-down-up"></i>
+                </button>
+            </div>
+
+            <div class="datetime-row">
+                <div class="datetime-field">
+                    <i class="ph ph-calendar"></i>
+                    <input type="date" id="travelDate" value="2026-04-22">
+                </div>
+                <div class="datetime-field">
+                    <i class="ph ph-clock"></i>
+                    <input type="time" id="travelTime" value="08:00">
+                </div>
+            </div>
+
+            <div class="vehicle-row">
+                <label class="vehicle-chip active" data-vehicle="lkw">
+                    <i class="ph ph-truck"></i>
+                    <span>LKW</span>
+                </label>
+                <label class="vehicle-chip" data-vehicle="transporter">
+                    <i class="ph ph-van"></i>
+                    <span>Transporter</span>
+                </label>
+                <label class="vehicle-chip" data-vehicle="bus">
+                    <i class="ph ph-bus"></i>
+                    <span>Bus</span>
+                </label>
+            </div>
+
+            <button class="search-btn" id="searchBtn">
+                <i class="ph ph-magnifying-glass"></i>
+                <span>Routen berechnen</span>
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div class="results-section" id="resultsSection" style="display:none;">
+            <div class="results-header">
+                <h2>Routenvorschlaege</h2>
+                <span class="results-count" id="resultsCount">3 Routen</span>
+            </div>
+
+            <div class="routes-list" id="routesList">
+                <!-- Routes will be injected by JS -->
+            </div>
+
+            <!-- Alternative Departure Times -->
+            <div class="time-suggestions" id="timeSuggestions">
+                <div class="time-suggestions-header">
+                    <h3>
+                        <i class="ph ph-clock-countdown"></i>
+                        Alternative Abfahrtszeiten
+                    </h3>
+                    <span class="time-hint">Verkehrslast besser verteilen</span>
+                </div>
+                <div class="route-time-recommendation" id="routeTimeRecommendation"></div>
+                <div class="time-slots" id="timeSlots">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+
+            <!-- Traffic Heatmap -->
+            <div class="traffic-heatmap-section" id="trafficHeatmap">
+                <div class="heatmap-header">
+                    <h3>
+                        <i class="ph ph-chart-bar"></i>
+                        Verkehrsdichte nach Uhrzeit
+                    </h3>
+                    <div class="heatmap-day-selector" id="heatmapDaySelector">
+                        <!-- Day tabs injected by JS -->
+                    </div>
+                </div>
+                <div class="heatmap-chart" id="heatmapChart">
+                    <!-- Heatmap bars injected by JS -->
+                </div>
+                <div class="heatmap-legend">
+                    <span><span class="h-dot low"></span> Gering</span>
+                    <span><span class="h-dot medium"></span> Mittel</span>
+                    <span><span class="h-dot high"></span> Hoch</span>
+                    <span><span class="h-dot peak"></span> Stoßzeit</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Route Detail Panel (hidden by default) -->
+        <div class="route-detail-panel" id="routeDetailPanel" style="display:none;">
+            <button class="back-btn" id="backBtn">
+                <i class="ph ph-arrow-left"></i>
+                <span>Zurück zur Übersicht</span>
+            </button>
+            <div class="detail-content" id="detailContent">
+                <!-- Detail content injected by JS -->
+            </div>
+        </div>
+    </aside>
+
+    <!-- Map Controls -->
+    <div class="map-controls">
+        <button class="map-control-btn" id="toggleSidebar" title="Sidebar an/aus">
+            <i class="ph ph-sidebar-simple"></i>
+        </button>
+        <button class="map-control-btn" id="themeToggle" title="Bright Mode aktivieren"
+            aria-label="Bright Mode aktivieren">
+            <i class="ph ph-sun"></i>
+        </button>
+        <button class="map-control-btn" id="layerToggle" title="Karten-Layer">
+            <i class="ph ph-stack"></i>
+        </button>
+        <button class="map-control-btn" id="zoomToFit" title="Gesamtroute anzeigen">
+            <i class="ph ph-arrows-out"></i>
+        </button>
+    </div>
+
+    <!-- Layer Panel -->
+    <div class="layer-panel" id="layerPanel" style="display:none;">
+        <h3>Daten-Layer</h3>
+        <label class="layer-toggle">
+            <input type="checkbox" id="layerTraffic">
+            <span class="layer-icon" style="--layer-color: #ef4444"><i class="ph ph-traffic-signal"></i></span>
+            Verkehrsdichte
+        </label>
+        <label class="layer-toggle">
+            <input type="checkbox" id="layerNoise">
+            <span class="layer-icon" style="--layer-color: #f59e0b"><i class="ph ph-speaker-high"></i></span>
+            Lärmkartierung
+        </label>
+        <label class="layer-toggle">
+            <input type="checkbox" id="layerAir">
+            <span class="layer-icon" style="--layer-color: #10b981"><i class="ph ph-wind"></i></span>
+            Luftqualität
+        </label>
+        <label class="layer-toggle">
+            <input type="checkbox" id="layerAccidents">
+            <span class="layer-icon" style="--layer-color: #dc2626"><i class="ph ph-warning"></i></span>
+            Unfallatlas
+        </label>
+        <label class="layer-toggle">
+            <input type="checkbox" id="layerConstruction">
+            <span class="layer-icon" style="--layer-color: #f97316"><i class="ph ph-barricade"></i></span>
+            Baustellen
+        </label>
+        <label class="layer-toggle">
+            <input type="checkbox" id="layerBridges">
+            <span class="layer-icon" style="--layer-color: #6366f1"><i class="ph ph-bridge"></i></span>
+            Infrastruktur
+        </label>
+        <label class="layer-toggle">
+            <input type="checkbox" id="layerRest">
+            <span class="layer-icon" style="--layer-color: #0ea5e9"><i class="ph ph-coffee"></i></span>
+            Rastanlagen
+        </label>
+    </div>
+
+    <!-- Legend -->
+    <div class="map-legend" id="mapLegend" style="display:none;">
+        <h4>Routenbewertung</h4>
+        <div class="legend-item"><span class="legend-color eco"></span> Eco-Score hoch (günstigere Maut)</div>
+        <div class="legend-item"><span class="legend-color mid"></span> Eco-Score mittel</div>
+        <div class="legend-item"><span class="legend-color low"></span> Eco-Score niedrig (teurere Maut)</div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <i class="ph ph-navigation-arrow"></i>
+        </div>
+        <p>Routen werden berechnet...</p>
+        <span class="loading-sub">Analyse von Verkehr, Umwelt & Infrastruktur</span>
+    </div>
+
+    <!-- Authority Login Modal -->
+    <div class="authority-modal-overlay" id="authorityLoginModal" style="display:none;">
+        <div class="authority-login-card">
+            <button class="authority-modal-close" id="authorityLoginClose" title="Schließen">
+                <i class="ph ph-x"></i>
+            </button>
+            <div class="authority-login-brand">
+                <!-- Toll Collect Logo hier einfügen: <img src="path/to/toll-collect-logo.png" alt="Toll Collect GmbH"> -->
+                <div class="authority-logo-placeholder" id="authorityLogoSlot">
+                    <i class="ph ph-buildings"></i>
+                </div>
+                <div class="authority-login-title">
+                    <h2>Toll Collect GmbH</h2>
+                    <span>Verwaltungsportal</span>
+                </div>
+            </div>
+            <div class="authority-login-form">
+                <label class="authority-field">
+                    <span>Benutzer</span>
+                    <input type="text" id="authorityUser" value="admin" autocomplete="off">
+                </label>
+                <label class="authority-field">
+                    <span>Passwort</span>
+                    <input type="password" id="authorityPass" placeholder="••••••••" autocomplete="off">
+                </label>
+                <div class="authority-login-error" id="authorityLoginError"></div>
+                <button class="authority-login-submit" id="authorityLoginSubmit">
+                    <i class="ph ph-sign-in"></i>
+                    <span>Anmelden</span>
+                </button>
+                <div class="authority-login-hint">
+                    <i class="ph ph-info"></i>
+                    <span>Demo-Zugang: Passwort <code>admin</code></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authority Dashboard -->
+    <div class="authority-dashboard" id="authorityDashboard" style="display:none;">
+        <header class="authority-header">
+            <div class="authority-header-brand">
+                <!-- Toll Collect Logo hier einfügen (kleine Variante) -->
+                <div class="authority-logo-placeholder small" id="authorityHeaderLogo">
+                    <i class="ph ph-buildings"></i>
+                </div>
+                <div class="authority-header-titles">
+                    <h1>Analyse</h1>
+                    <span>Quartalsbericht &amp; Handlungsempfehlungen</span>
+                </div>
+            </div>
+            <div class="authority-header-controls">
+                <label class="authority-select">
+                    <i class="ph ph-map-pin-area"></i>
+                    <select id="authorityCitySelect"></select>
+                </label>
+                <label class="authority-select">
+                    <i class="ph ph-calendar-dots"></i>
+                    <select id="authorityQuarterSelect"></select>
+                </label>
+                <button class="authority-logout-btn" id="authorityLogoutBtn">
+                    <i class="ph ph-sign-out"></i>
+                    <span>Abmelden</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="authority-main">
+            <section class="authority-section">
+                <div class="authority-section-header">
+                    <h2>Kennzahlen im Quartalsvergleich</h2>
+                    <span class="authority-section-sub" id="authorityQuarterLabel"></span>
+                </div>
+                <div class="authority-kpi-grid" id="authorityKpiGrid"></div>
+            </section>
+
+            <section class="authority-section">
+                <div class="authority-section-header">
+                    <h2>Verteilung nach Monaten</h2>
+                    <span class="authority-section-sub">Verkehrsdichte &amp; Unfälle im Quartal</span>
+                </div>
+                <div class="authority-chart" id="authorityChart"></div>
+            </section>
+
+            <section class="authority-section">
+                <div class="authority-section-header">
+                    <h2>Handlungsempfehlungen</h2>
+                    <span class="authority-section-sub">Regelbasiert aus den Datenänderungen</span>
+                </div>
+                <div class="authority-rec-list" id="authorityRecList"></div>
+            </section>
+
+            <section class="authority-section authority-footer-note">
+                <i class="ph ph-shield-check"></i>
+                <div>
+                    <strong>Full-Cycle-Prinzip:</strong> Mautanpassung alle 3 Monate →
+                    Auswertung der Verkehrs- und Unfallzahlen → konkrete Bau-, Wartungs-
+                    oder Tarifempfehlung → neue Kalibrierung im nächsten Quartal.
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
