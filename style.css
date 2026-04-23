@@ -2767,6 +2767,110 @@ body[data-theme="light"] .authority-logout-btn:hover {
     line-height: 1.4;
 }
 
+/* Impact comparison */
+.authority-impact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.authority-impact-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    padding: 12px 13px;
+}
+
+.authority-impact-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.authority-impact-top i {
+    font-size: 14px;
+    color: var(--accent);
+}
+
+.authority-impact-delta {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.authority-impact-card.trend-good {
+    border-color: rgba(74, 222, 128, 0.35);
+    background: rgba(74, 222, 128, 0.07);
+}
+
+.authority-impact-card.trend-bad {
+    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.07);
+}
+
+.authority-impact-card.trend-bad .authority-impact-delta {
+    color: #f87171;
+}
+
+.authority-impact-card.trend-good .authority-impact-delta {
+    color: #4ade80;
+}
+
+.authority-issue-marker {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 13px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+    background: var(--bg-input);
+}
+
+.authority-issue-marker i {
+    font-size: 18px;
+    margin-top: 1px;
+}
+
+.authority-issue-marker strong {
+    color: var(--text-primary);
+}
+
+.authority-issue-marker.critical {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.1);
+    color: #fecaca;
+}
+
+.authority-issue-marker.critical i {
+    color: #f87171;
+}
+
+.authority-issue-marker.success {
+    border-color: rgba(74, 222, 128, 0.45);
+    background: rgba(74, 222, 128, 0.1);
+    color: #bbf7d0;
+}
+
+.authority-issue-marker.success i {
+    color: #4ade80;
+}
+
+.authority-issue-marker.info {
+    border-color: rgba(56, 189, 248, 0.45);
+    background: rgba(56, 189, 248, 0.1);
+}
+
+.authority-issue-marker.info i {
+    color: #38bdf8;
+}
+
 /* Chart */
 .authority-chart {
     display: grid;

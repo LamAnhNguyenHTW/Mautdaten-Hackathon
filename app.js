@@ -1,26 +1,26 @@
-/* ============================================
+﻿/* ============================================
    EcoToll - Intelligente Mautrouten
    Application Logic
    ============================================ */
 
 // ---- City Coordinates ----
 const CITIES = {
-    'muenchen': { lat: 48.1351, lng: 11.5820, name: 'München' },
+    'muenchen': { lat: 48.1351, lng: 11.5820, name: 'Muenchen' },
     'berlin': { lat: 52.5200, lng: 13.4050, name: 'Berlin' },
     'hamburg': { lat: 53.5511, lng: 9.9937, name: 'Hamburg' },
     'frankfurt': { lat: 50.1109, lng: 8.6821, name: 'Frankfurt am Main' },
-    'koeln': { lat: 50.9375, lng: 6.9603, name: 'Köln' },
-    'duesseldorf': { lat: 51.2277, lng: 6.7735, name: 'Düsseldorf' },
+    'koeln': { lat: 50.9375, lng: 6.9603, name: 'Koeln' },
+    'duesseldorf': { lat: 51.2277, lng: 6.7735, name: 'Duesseldorf' },
     'stuttgart': { lat: 48.7758, lng: 9.1829, name: 'Stuttgart' },
     'dortmund': { lat: 51.5136, lng: 7.4653, name: 'Dortmund' },
-    'nuernberg': { lat: 49.4521, lng: 11.0767, name: 'Nürnberg' },
+    'nuernberg': { lat: 49.4521, lng: 11.0767, name: 'Nuernberg' },
     'leipzig': { lat: 51.3397, lng: 12.3731, name: 'Leipzig' },
     'hannover': { lat: 52.3759, lng: 9.7320, name: 'Hannover' },
     'dresden': { lat: 51.0504, lng: 13.7373, name: 'Dresden' },
     'bremen': { lat: 53.0793, lng: 8.8017, name: 'Bremen' },
     'essen': { lat: 51.4556, lng: 7.0116, name: 'Essen' },
     'kassel': { lat: 51.3127, lng: 9.4797, name: 'Kassel' },
-    'wuerzburg': { lat: 49.7913, lng: 9.9534, name: 'Würzburg' },
+    'wuerzburg': { lat: 49.7913, lng: 9.9534, name: 'Wuerzburg' },
     'erfurt': { lat: 50.9787, lng: 11.0328, name: 'Erfurt' },
     'magdeburg': { lat: 52.1205, lng: 11.6276, name: 'Magdeburg' },
     'regensburg': { lat: 49.0134, lng: 12.1016, name: 'Regensburg' },
@@ -1803,7 +1803,7 @@ function generateSynchronizedPOIs(routes) {
         const match = route.criteria.construction.value.match(/(d+)/);
         if (match && !route.criteria.construction.value.includes('Keine')) constrCount = parseInt(match[1]);
         for (let i = 0; i < constrCount; i++) {
-            route.pois.construction.push({ latlng: getRandomWaypoint(), shape: 'icon', iconType: 'construction', label: 'Baustelle / Sperrung', info: 'Verz-gerung m-glich', color: '#f97316' });
+            route.pois.construction.push({ latlng: getRandomWaypoint(), shape: 'icon', iconType: 'construction', label: 'Baustelle / Sperrung', info: 'Verzögerung möglich', color: '#f97316' });
         }
 
         let bridgeCount = parseInt(route.criteria.bridges.value) || 0;
@@ -1817,12 +1817,12 @@ function generateSynchronizedPOIs(routes) {
         const rMatch = route.criteria.rest.value.match(/(d+)/);
         if (rMatch) restCount = parseInt(rMatch[1]);
         for (let i = 0; i < restCount; i++) {
-            route.pois.rest.push({ latlng: getRandomWaypoint(), shape: 'icon', iconType: 'rest', label: 'Rastanlage', info: 'Service verf-gbar', color: '#0ea5e9' });
+            route.pois.rest.push({ latlng: getRandomWaypoint(), shape: 'icon', iconType: 'rest', label: 'Rastanlage', info: 'Service verfügbar', color: '#0ea5e9' });
         }
 
         const accidentSeverity = getCriterionSeverity(route.criteria.accidents);
         const accCount = accidentSeverity === 'high' ? 4 : (accidentSeverity === 'moderate' ? 2 : 1);
-        const accInfo = accidentSeverity === 'high' ? 'Erh-htes Unfallrisiko' : (accidentSeverity === 'moderate' ? 'Mittleres Unfallrisiko' : 'Niedriges Unfallrisiko');
+        const accInfo = accidentSeverity === 'high' ? 'Erhöhtes Unfallrisiko' : (accidentSeverity === 'moderate' ? 'Mittleres Unfallrisiko' : 'Niedriges Unfallrisiko');
         for (let i = 0; i < accCount; i++) {
             route.pois.accidents.push({ latlng: getRandomWaypoint(), shape: 'icon', iconType: 'accident', label: 'Unfallschwerpunkt', info: accInfo, color: '#dc2626' });
         }
@@ -1831,7 +1831,7 @@ function generateSynchronizedPOIs(routes) {
         const trCount = trafficSeverity === 'high' ? 3 : (trafficSeverity === 'moderate' ? 2 : 1);
         const trafficColor = trafficSeverity === 'high' ? '#ef4444' : (trafficSeverity === 'moderate' ? '#f59e0b' : '#22c55e');
         const trafficRadius = trafficSeverity === 'high' ? 9500 : (trafficSeverity === 'moderate' ? 6500 : 4500);
-        const trafficInfo = trafficSeverity === 'high' ? 'Dichte Verkehrsströme / Stop-and-Go' : (trafficSeverity === 'moderate' ? 'M-ige Verkehrsdichte' : 'Fl-ssiger Verkehr');
+        const trafficInfo = trafficSeverity === 'high' ? 'Dichte Verkehrsströme / Stop-and-Go' : (trafficSeverity === 'moderate' ? 'Mäßige Verkehrsdichte' : 'Flüssiger Verkehr');
         for (let i = 0; i < trCount; i++) {
             route.pois.traffic.push({ latlng: getRandomWaypoint(), shape: 'area', radius: trafficRadius, label: 'Verkehrsdichte-Zone', info: trafficInfo, color: trafficColor });
         }
@@ -2371,6 +2371,7 @@ const _authorityAccidentCache = new Map();
 let isAuthorityLoggedIn = false;
 let authoritySelectedCity = 'berlin';
 let authoritySelectedQuarterId = QUARTERS[0].id;
+let authorityCityRiskRequestId = 0;
 
 function authorityHash(str) {
     let h = 2166136261;
@@ -2479,9 +2480,11 @@ async function getAuthorityStats(cityKey, quarterId) {
 
     const tollMult = getTollMultiplier(density);
     const tollRevenue = Math.round(density * tollMult * sizeFactor * 18000 + authorityRandInt(rng, -40000, 40000));
-    const utilization = Math.round(Math.min(98, density * 0.9 + authorityRandInt(rng, -4, 6)));
+    const utilization = Math.round(clamp(10 + density * 0.92 + sizeFactor * 2.2, 18, 98));
     const construction = Math.round(Math.min(40, 6 + authorityRandInt(rng, 0, 22) + (seasonal.density > 0 ? 3 : -1)));
     const restStopScore = Math.round(3 + rng() * 6);
+    const co2Index = Math.round(clamp(8 + density * 0.88 + sizeFactor * 3.0 + construction * 0.08, 12, 98));
+    const noiseIndex = Math.round(clamp(12 + density * 0.84 + sizeFactor * 4.0 + construction * 0.12, 10, 99));
 
     const densityByMonth = [0, 1, 2].map(function () {
         return Math.max(15, Math.min(95, density + authorityRandInt(rng, -6, 6)));
@@ -2498,6 +2501,8 @@ async function getAuthorityStats(cityKey, quarterId) {
         accidents: accidents,
         tollRevenue: tollRevenue,
         utilization: utilization,
+        co2Index: co2Index,
+        noiseIndex: noiseIndex,
         construction: construction,
         restStopScore: restStopScore,
         densityByMonth: densityByMonth,
@@ -2528,25 +2533,37 @@ function formatCurrency(value) {
     return value.toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' €';
 }
 
+function isInfrastructureRiskCase(prev, curr) {
+    if (!prev || !curr) return false;
+    const densityDelta = authorityPctChange(prev.density, curr.density);
+    const utilizationDelta = authorityPctChange(prev.utilization, curr.utilization);
+    const co2Delta = authorityPctChange(prev.co2Index, curr.co2Index);
+    const noiseDelta = authorityPctChange(prev.noiseIndex, curr.noiseIndex);
+    const accidentsDelta = authorityPctChange(prev.accidents, curr.accidents);
+
+    return densityDelta < 0 &&
+        utilizationDelta < 0 &&
+        co2Delta < 0 &&
+        noiseDelta < 0 &&
+        accidentsDelta > 0;
+}
+
 const RECOMMENDATION_RULES = [
     {
         id: 'infrastructure',
         title: 'Straßeninfrastruktur prüfen',
         icon: 'ph-wrench',
         severity: 'high',
-        badge: 'Priorität hoch',
+        badge: 'Infrastruktur-Risiko',
         condition: function (p, c) {
-            const dDensity = authorityPctChange(p.density, c.density);
-            const dAccidents = authorityPctChange(p.accidents, c.accidents);
-            return dDensity <= -15 && dAccidents >= -10 && dAccidents <= 10;
+            return isInfrastructureRiskCase(p, c);
         },
         reason: function (p, c) {
-            return 'Verkehr ist um ' + Math.abs(authorityPctChange(p.density, c.density)).toFixed(1) +
-                ' % gesunken, Unfälle bleiben aber nahezu konstant (' +
+            return 'Verkehrsdichte, Auslastung, CO2 und Lärm sinken, aber Unfälle steigen (' +
                 formatSigned(authorityPctChange(p.accidents, c.accidents)) + ' %).';
         },
         action: function () {
-            return 'Fahrbahnzustand und Beschilderung vor Ort untersuchen - weniger Verkehr bei gleichbleibenden Unfällen deutet auf <strong>Infrastrukturmängel</strong> hin (Schlaglöcher, unübersichtliche Abschnitte, fehlende Leitplanken).';
+            return 'Das spricht für <strong>Infrastrukturprobleme</strong> statt reines Fahrerverhalten. Fahrbahnzustand, Knotenpunkte, Leitplanken und Baustellenführung priorisiert prüfen.';
         },
     },
     {
@@ -2728,7 +2745,9 @@ function populateAuthoritySelectors() {
         for (const [key, city] of entries) {
             const opt = document.createElement('option');
             opt.value = key;
-            opt.textContent = city.name + (AUTHORITY_REAL_DATA_CITIES.includes(key) ? ' · ● Live-Daten' : '');
+            const baseLabel = city.name + (AUTHORITY_REAL_DATA_CITIES.includes(key) ? ' · ● Live-Daten' : '');
+            opt.dataset.baseLabel = baseLabel;
+            opt.textContent = baseLabel;
             citySel.appendChild(opt);
         }
         citySel.value = authoritySelectedCity;
@@ -2743,6 +2762,34 @@ function populateAuthoritySelectors() {
         }
         quarterSel.value = authoritySelectedQuarterId;
     }
+}
+
+async function refreshAuthorityCityRiskMarkers(currentQuarterId) {
+    const citySel = document.getElementById('authorityCitySelect');
+    if (!citySel || !citySel.options.length) return;
+
+    const previousId = getPreviousQuarterId(currentQuarterId);
+    if (!previousId) return;
+
+    const requestId = ++authorityCityRiskRequestId;
+    const cityKeys = Array.from(citySel.options).map(opt => opt.value);
+    const results = await Promise.all(cityKeys.map(async cityKey => {
+        const [curr, prev] = await Promise.all([
+            getAuthorityStats(cityKey, currentQuarterId),
+            getAuthorityStats(cityKey, previousId),
+        ]);
+        return { cityKey, hasRisk: isInfrastructureRiskCase(prev, curr) };
+    }));
+
+    if (requestId !== authorityCityRiskRequestId) return;
+
+    const riskByCity = new Map(results.map(r => [r.cityKey, r.hasRisk]));
+    Array.from(citySel.options).forEach(opt => {
+        const baseLabel = opt.dataset.baseLabel || opt.textContent || opt.value;
+        opt.textContent = riskByCity.get(opt.value)
+            ? `${baseLabel} ⚠`
+            : baseLabel;
+    });
 }
 
 async function renderAuthorityDashboard() {
@@ -2768,6 +2815,7 @@ async function renderAuthorityDashboard() {
     renderAuthorityChart(prev, curr);
     const recs = runRecommendationEngine(prev, curr);
     renderAuthorityRecommendations(recs);
+    refreshAuthorityCityRiskMarkers(currentId);
 }
 
 function renderAuthorityKPIs(prev, curr) {
@@ -2794,23 +2842,31 @@ function renderAuthorityKPIs(prev, curr) {
             context: curr.hasRealData ? 'Echte Unfalldaten (Unfallatlas)' : 'Geschätzt auf Basis der Stadtgröße',
         },
         {
-            label: 'Maut-Einnahmen',
-            icon: 'ph-currency-eur',
-            value: curr.tollRevenue,
-            unit: '',
-            formatter: formatCurrency,
-            prevVal: prev ? prev.tollRevenue : null,
-            goodDirection: 'up',
-            context: 'Hochgerechnet für das Quartal',
-        },
-        {
-            label: 'Ø Auslastung',
+            label: 'Auslastung',
             icon: 'ph-gauge',
             value: curr.utilization,
             unit: '%',
             prevVal: prev ? prev.utilization : null,
             goodDirection: 'down',
             context: 'Anteil der Netzkapazität',
+        },
+        {
+            label: 'CO2',
+            icon: 'ph-cloud',
+            value: curr.co2Index,
+            unit: '%',
+            prevVal: prev ? prev.co2Index : null,
+            goodDirection: 'down',
+            context: 'CO2-Belastungsindex im Korridor',
+        },
+        {
+            label: 'Lärm',
+            icon: 'ph-speaker-high',
+            value: curr.noiseIndex,
+            unit: '%',
+            prevVal: prev ? prev.noiseIndex : null,
+            goodDirection: 'down',
+            context: 'Lärmbelastung entlang der Hauptachsen',
         },
     ];
 
