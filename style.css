@@ -175,14 +175,21 @@ html, body {
 .logo-icon {
     width: 42px;
     height: 42px;
-    background: linear-gradient(135deg, var(--accent), #22c55e);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
-    color: #0a0d14;
-    box-shadow: 0 0 20px var(--accent-glow);
+    overflow: hidden;
+    box-shadow: 0 4px 16px var(--shadow-soft);
+}
+
+.app-logo-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .logo-text h1 {
