@@ -9,3 +9,8 @@ Daten/**
 !Daten/geojson/unfaelle_berlin.json
 !Daten/geojson/unfaelle_dortmund.json
 !Daten/geojson/unfaelle_kassel.json
+!Daten/geojson/unfaelle_hamburg.json
+!Daten/geojson/unfaelle_hannover.json
+!Daten/geojson/unfaelle_muenchen.json
+
+
