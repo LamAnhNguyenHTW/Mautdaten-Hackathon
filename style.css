@@ -1652,7 +1652,7 @@ body[data-theme="light"] .route-skeleton::after {
     left: calc(var(--sidebar-width) + 16px);
     display: flex;
     gap: 8px;
-    z-index: 900;
+    z-index: 950;
     transition: left var(--transition-smooth);
 }
 
@@ -1793,10 +1793,12 @@ body[data-theme="light"] .route-skeleton::after {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 14px 18px;
-    z-index: 900;
+    z-index: 820;
     box-shadow: 0 4px 16px rgba(0,0,0,0.2);
     animation: fadeIn 0.3s ease;
     transition: left var(--transition-smooth);
+    pointer-events: none;
+    max-width: min(360px, calc(100vw - 24px));
 }
 
 .map-legend h4 {
@@ -2050,6 +2052,77 @@ body[data-theme="light"] .layer-popup-air {
 /* ============================================
    RESPONSIVE
    ============================================ */
+@media (max-width: 1200px) {
+    :root {
+        --sidebar-width: 380px;
+    }
+
+    .route-input-section,
+    .results-section,
+    .route-detail-panel {
+        padding: 18px 20px;
+    }
+
+    .map-controls {
+        left: calc(var(--sidebar-width) + 14px);
+    }
+
+    .layer-panel {
+        left: calc(var(--sidebar-width) + 48px);
+    }
+
+    .map-legend {
+        left: calc(var(--sidebar-width) + 14px);
+    }
+}
+
+@media (max-width: 992px) {
+    :root {
+        --sidebar-width: 350px;
+    }
+
+    .logo {
+        padding: 16px 18px;
+    }
+
+    .route-input-section,
+    .results-section,
+    .route-detail-panel {
+        padding: 16px 18px;
+    }
+
+    .map-controls {
+        top: 12px;
+        left: calc(var(--sidebar-width) + 12px);
+        gap: 6px;
+    }
+
+    .layer-panel {
+        top: 58px;
+        left: calc(var(--sidebar-width) + 44px);
+    }
+
+    .authority-header {
+        padding: 16px 20px;
+    }
+
+    .authority-main {
+        padding: 20px;
+    }
+
+    .authority-header-controls {
+        width: 100%;
+    }
+
+    .authority-select {
+        flex: 1 1 220px;
+    }
+
+    .map-legend {
+        bottom: 88px;
+    }
+}
+
 @media (max-width: 768px) {
     :root {
         --sidebar-width: 100vw;
@@ -2057,7 +2130,8 @@ body[data-theme="light"] .layer-popup-air {
 
     .sidebar {
         width: 100%;
-        height: 60vh;
+        height: 72dvh;
+        max-height: 72dvh;
         top: auto;
         bottom: 0;
         border-right: none;
@@ -2065,21 +2139,140 @@ body[data-theme="light"] .layer-popup-air {
         border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     }
 
+    .sidebar.hidden {
+        transform: translateY(calc(100% + 16px));
+    }
+
+    .logo {
+        padding: 14px 16px;
+    }
+
+    .route-input-section,
+    .results-section,
+    .route-detail-panel {
+        padding: 14px 16px 16px;
+    }
 
     .map-controls {
-        left: 16px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
         top: auto;
-        bottom: calc(60vh + 16px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 6px;
+        padding: 6px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-glass);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: 0 8px 20px var(--shadow-soft);
+        max-width: calc(100vw - 20px);
     }
 
     .layer-panel {
-        left: 16px;
+        left: 12px;
+        right: 12px;
         top: auto;
-        bottom: calc(60vh + 64px);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 70px);
+        min-width: 0;
+        max-width: none;
+    }
+
+    .sidebar.hidden ~ .map-controls {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+        top: auto;
+    }
+
+    .sidebar.hidden ~ .layer-panel {
+        left: 12px;
+        right: 12px;
+        bottom: 64px;
+        top: auto;
+    }
+
+    .sidebar:not(.hidden) ~ .map-controls {
+        top: 12px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        bottom: auto;
+    }
+
+    .sidebar:not(.hidden) ~ .layer-panel {
+        top: 68px;
+        right: 12px;
+        left: 12px;
+        bottom: auto;
+        width: auto;
     }
 
     .map-legend {
         display: none;
+    }
+
+    .datetime-row,
+    .vehicle-row {
+        flex-direction: column;
+    }
+
+    .detail-criteria {
+        grid-template-columns: 1fr;
+    }
+
+    .detail-price-row {
+        flex-wrap: wrap;
+    }
+
+    .time-suggestions-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .time-slot {
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .time-slot-datetime,
+    .time-slot-details {
+        flex-wrap: wrap;
+    }
+
+    .time-slot-right {
+        text-align: left;
+    }
+}
+
+@media (max-width: 560px) {
+    .route-card {
+        padding: 14px;
+    }
+
+    .route-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .route-price-section {
+        text-align: left;
+    }
+
+    .authority-login-card {
+        padding: 26px 20px 18px;
+        border-radius: var(--radius-lg);
+    }
+
+    .authority-login-brand {
+        gap: 10px;
+        margin-bottom: 16px;
     }
 }
 
@@ -3101,18 +3294,66 @@ body[data-theme="light"] .authority-rec-card.severity-positive .authority-rec-ba
     .authority-header {
         padding: 14px 18px;
     }
+
+    .authority-header-controls {
+        gap: 8px;
+    }
+
+    .authority-select,
+    .authority-logout-btn {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .authority-select select {
+        width: 100%;
+    }
+
     .authority-main {
         padding: 18px;
     }
+
     .authority-section {
         padding: 18px 16px;
     }
+
     .authority-chart {
         grid-template-columns: 1fr;
         gap: 18px;
     }
+
+    .authority-kpi-grid,
+    .authority-impact-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .authority-rec-card {
+        padding: 14px 14px 14px 18px;
+    }
+
     .authority-login-btn span {
         display: none;
+    }
+}
+
+@media (max-width: 420px) {
+    .map-control-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .authority-header {
+        padding: 12px 14px;
+    }
+
+    .authority-main {
+        padding: 14px;
+        gap: 14px;
+    }
+
+    .authority-section {
+        padding: 14px 12px;
     }
 }
 
