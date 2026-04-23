@@ -277,23 +277,28 @@ function getRouteDiscountByContext(route, density, hour, dayType) {
     // Time-sensitive adjustment.
     let timeAdj = 0;
     if (isPeak) timeAdj -= 5;
-    if (isLateNight) timeAdj += 5;
+    if (isLateNight) {
+        const lateNightByHour = { 0: 6, 1: 5, 2: 4, 3: 3, 4: 2 };
+        timeAdj += lateNightByHour[hour] ?? 4;
+    }
     else if (isNight) timeAdj += 2;
     else if (hour >= 11 && hour <= 14) timeAdj += 1;
     if (isWeekend) timeAdj += 1;
 
-    let discount = Math.round(baseByRoute + densityAdj + timeAdj);
+    // Add a small continuous component so adjacent hours do not collapse to identical prices.
+    const microAdj = ((hour % 4) - 1.5) * 0.35 + ((density % 7) * 0.05);
+    let discount = baseByRoute + densityAdj + timeAdj + microAdj;
 
     // Guardrails per route class.
     if (route.id === 2) {
-        discount = clamp(discount, -30, -4); // fastest always surcharge
+        discount = clamp(discount, -30, -2); // fastest stays surcharge, but with finer night spread
     } else if (route.id === 1) {
         discount = clamp(discount, 10, 34);
     } else {
         discount = clamp(discount, 14, 40);
     }
 
-    return discount;
+    return Number(discount.toFixed(1));
 }
 
 function getRouteSlotPricing(route, density, hour, dayType, standardBaseToll = null) {
@@ -830,6 +835,46 @@ function normalizeLkwBasePriceInput() {
     lkwBasePriceInput.value = normalized.toFixed(1);
 }
 
+function pad2(value) {
+    return String(value).padStart(2, '0');
+}
+
+function isValidDateInput(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+}
+
+function isValidTimeInput(value) {
+    return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(value || ''));
+}
+
+function getDynamicDefaultDateTime() {
+    const now = new Date();
+    const rounded = new Date(now);
+    rounded.setSeconds(0, 0);
+    rounded.setMinutes(Math.ceil(now.getMinutes() / 5) * 5);
+
+    return {
+        date: `${rounded.getFullYear()}-${pad2(rounded.getMonth() + 1)}-${pad2(rounded.getDate())}`,
+        time: `${pad2(rounded.getHours())}:${pad2(rounded.getMinutes())}`,
+    };
+}
+
+function ensureTravelDateTimeDefaults() {
+    const fallback = getDynamicDefaultDateTime();
+
+    if (travelDate && !isValidDateInput(travelDate.value)) {
+        travelDate.value = fallback.date;
+    }
+    if (travelTime && !isValidTimeInput(travelTime.value)) {
+        travelTime.value = fallback.time;
+    }
+
+    return {
+        date: (travelDate && isValidDateInput(travelDate.value)) ? travelDate.value : fallback.date,
+        time: (travelTime && isValidTimeInput(travelTime.value)) ? travelTime.value : fallback.time,
+    };
+}
+
 function showAppDialog(message) {
     if (!appDialogOverlay || !appDialogMessage) return;
     appDialogMessage.textContent = String(message || '');
@@ -883,6 +928,7 @@ function setTheme(theme) {
 
 const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
 setTheme(savedTheme || 'dark');
+ensureTravelDateTimeDefaults();
 setLkwConfigEditable(false);
 refreshPricingFromVehicleConfig();
 
@@ -1047,10 +1093,7 @@ destInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSea
 async function handleSearch() {
     const origin = originInput.value.trim();
     const destination = destInput.value.trim();
-    const date = travelDate.value || '2026-04-22';
-    const time = travelTime.value || '08:00';
-    travelDate.value = date;
-    travelTime.value = time;
+    const { date, time } = ensureTravelDateTimeDefaults();
     const originCity = resolveCity(origin);
     const destCity = resolveCity(destination);
 
@@ -1842,8 +1885,8 @@ function getTrafficLevel(density) {
 }
 
 function getTimeOfDayIcon(hour) {
-    if (hour >= 22 || hour < 5) return { icon: 'ph-moon-stars', class: 'night' };
-    if (hour >= 5 && hour < 10) return { icon: 'ph-sun-horizon', class: 'morning' };
+    if (hour >= 22 || hour < 4) return { icon: 'ph-moon-stars', class: 'night' };
+    if (hour >= 4 && hour < 10) return { icon: 'ph-sun-horizon', class: 'morning' };
     if (hour >= 10 && hour < 15) return { icon: 'ph-sun', class: 'midday' };
     if (hour >= 15 && hour < 20) return { icon: 'ph-sun-dim', class: 'evening' };
     return { icon: 'ph-moon', class: 'late' };
@@ -1987,7 +2030,14 @@ function renderRouteTimeRecommendation(recommendation) {
 function compressSuggestionSlots(slots) {
     if (!Array.isArray(slots) || slots.length === 0) return [];
     const grouped = [];
-    const keyOf = slot => `${slot.date}|${slot.dayName}|${slot.isToday ? 1 : 0}|${slot.price.toFixed(2)}`;
+    const keyOf = slot => [
+        slot.date,
+        slot.dayName,
+        slot.isToday ? 1 : 0,
+        slot.price.toFixed(2),
+        slot.pricing?.tollDiscount ?? '',
+        slot.density,
+    ].join('|');
 
     for (const slot of slots) {
         const prev = grouped[grouped.length - 1];
@@ -2009,6 +2059,20 @@ function compressSuggestionSlots(slots) {
     }
 
     return grouped;
+}
+
+function slotContainsHour(slot, hour) {
+    return Number.isFinite(slot?.startHour) &&
+        Number.isFinite(slot?.endHour) &&
+        hour >= slot.startHour &&
+        hour <= slot.endHour;
+}
+
+function getIconHourForSlot(slot) {
+    if (!slot) return 0;
+    if (slotContainsHour(slot, 5)) return 5;
+    if (slotContainsHour(slot, 4)) return 4;
+    return slot.startHour;
 }
 
 function renderTimeSuggestions(origin, destination, date, currentTime, bestRoute) {
@@ -2087,7 +2151,20 @@ function renderTimeSuggestions(origin, destination, date, currentTime, bestRoute
         return a.price - b.price;
     });
     const groupedCandidates = compressSuggestionSlots(candidates);
-    const bestCandidates = groupedCandidates.slice(0, 4);
+    let bestCandidates = groupedCandidates.slice(0, 4);
+
+    // Keep one dawn slot visible (05:00 preferred, otherwise 04:00) for better UX orientation.
+    const hasDawnSlot = bestCandidates.some(slot => slotContainsHour(slot, 5) || slotContainsHour(slot, 4));
+    if (!hasDawnSlot) {
+        const dawnFallback = groupedCandidates.find(slot => slotContainsHour(slot, 5))
+            || groupedCandidates.find(slot => slotContainsHour(slot, 4));
+        if (dawnFallback) {
+            bestCandidates = [...bestCandidates.slice(0, 3), dawnFallback];
+        }
+    }
+    const bestSlotKey = bestCandidates[0]
+        ? `${bestCandidates[0].date}|${bestCandidates[0].startHour}|${bestCandidates[0].endHour}`
+        : null;
 
     bestCandidates.sort((a, b) => {
         if (a.date === b.date) return a.startHour - b.startHour;
@@ -2103,11 +2180,12 @@ function renderTimeSuggestions(origin, destination, date, currentTime, bestRoute
 
     timeSlotsEl.innerHTML = bestCandidates.map((slot, idx) => {
         const traffic = getTrafficLevel(slot.density);
-        const timeIcon = getTimeOfDayIcon(slot.hour);
+        const timeIcon = getTimeOfDayIcon(getIconHourForSlot(slot));
         const tollPrice = slot.price.toFixed(2);
         const priceDiff = (currentPrice - slot.price).toFixed(2);
         const slotDiscount = formatTollPercentLabel(slot.pricing.tollDiscount);
-        const isBest = idx === 0 || slot.price === bestCandidates[0].price;
+        const slotKey = `${slot.date}|${slot.startHour}|${slot.endHour}`;
+        const isBest = bestSlotKey !== null && slotKey === bestSlotKey;
         const startTime = `${slot.startHour.toString().padStart(2, '0')}:00`;
         const endTime = `${slot.endHour.toString().padStart(2, '0')}:00`;
         const timeStr = slot.startHour === slot.endHour ? startTime : `${startTime}-${endTime}`;

@@ -578,6 +578,27 @@ input[type="number"].lkw-control::-webkit-inner-spin-button {
     font-weight: 600;
 }
 
+.pricing-cycle-note {
+    margin-top: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-muted);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.pricing-cycle-note strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.pricing-cycle-note.results-note {
+    margin-top: -4px;
+    margin-bottom: 14px;
+}
+
 @media (max-width: 620px) {
     .lkw-config-grid {
         grid-template-columns: 1fr;
@@ -1395,6 +1416,8 @@ body[data-theme="light"] .route-skeleton::after {
     border-radius: 4px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .time-slot-tag.best {
