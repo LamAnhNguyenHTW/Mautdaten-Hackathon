@@ -927,7 +927,7 @@ function setTheme(theme) {
 }
 
 const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-setTheme(savedTheme || 'dark');
+setTheme(savedTheme || 'light');
 ensureTravelDateTimeDefaults();
 setLkwConfigEditable(false);
 refreshPricingFromVehicleConfig();
