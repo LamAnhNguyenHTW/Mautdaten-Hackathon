@@ -86,19 +86,77 @@
                 </div>
             </div>
 
-            <div class="vehicle-row">
-                <label class="vehicle-chip active" data-vehicle="lkw">
-                    <i class="ph ph-truck"></i>
-                    <span>LKW</span>
-                </label>
-                <label class="vehicle-chip" data-vehicle="transporter">
-                    <i class="ph ph-van"></i>
-                    <span>Transporter</span>
-                </label>
-                <label class="vehicle-chip" data-vehicle="bus">
-                    <i class="ph ph-bus"></i>
-                    <span>Bus</span>
-                </label>
+            <div class="lkw-config-section" id="lkwConfigSection">
+                <div class="lkw-config-header">
+                    <div class="lkw-config-title">
+                        <i class="ph ph-truck"></i>
+                        <span>LKW-Eigenschaften</span>
+                    </div>
+                    <button class="lkw-edit-toggle" id="lkwEditToggle" type="button" title="LKW-Eigenschaften bearbeiten"
+                        aria-label="LKW-Eigenschaften bearbeiten" aria-pressed="false">
+                        <i class="ph ph-gear-six"></i>
+                    </button>
+                </div>
+                <div class="lkw-config-fields">
+                    <div class="lkw-config-grid">
+                        <div class="input-group">
+                            <label for="lkwWeight">Gewichtsklasse</label>
+                            <div class="input-wrapper lkw-input-wrapper">
+                                <select id="lkwWeight" class="lkw-control" disabled>
+                                    <option value="3.5">3.5-7.49t</option>
+                                    <option value="7.5">7.5-11.99t</option>
+                                    <option value="12">12-18t</option>
+                                    <option value="18" selected>mehr als 18t</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="lkwAxles">Achsen</label>
+                            <div class="input-wrapper lkw-input-wrapper">
+                                <select id="lkwAxles" class="lkw-control" disabled>
+                                    <option value="2">2 Achsen</option>
+                                    <option value="3">3 Achsen</option>
+                                    <option value="4">4 Achsen</option>
+                                    <option value="5" selected>5 Achsen</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="lkwEmission">Schadstoffklasse</label>
+                            <div class="input-wrapper lkw-input-wrapper">
+                                <select id="lkwEmission" class="lkw-control" disabled>
+                                    <option value="0">Euro 1 und 0</option>
+                                    <option value="2">Euro 2</option>
+                                    <option value="3">Euro 3</option>
+                                    <option value="4">Euro 4</option>
+                                    <option value="5">Euro 5 / EEV 1</option>
+                                    <option value="6" selected>Euro 6</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="lkwCo2">CO2-Klasse</label>
+                            <div class="input-wrapper lkw-input-wrapper">
+                                <select id="lkwCo2" class="lkw-control" disabled>
+                                    <option value="1" selected>1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="lkwBasePrice">Basispreis (Cent pro km)</label>
+                        <div class="input-wrapper lkw-input-wrapper">
+                            <input type="number" id="lkwBasePrice" value="34.80" step="0.1" min="10" max="120" class="lkw-control" disabled>
+                        </div>
+                    </div>
+                </div>
+                <div class="lkw-tariff-summary" id="lkwTariffSummary">
+                    Tarif aktiv: <strong id="lkwTariffValue">18.00 EUR + 0.165 EUR/km</strong>
+                </div>
             </div>
 
             <button class="search-btn" id="searchBtn">
@@ -110,7 +168,7 @@
         <!-- Results -->
         <div class="results-section" id="resultsSection" style="display:none;">
             <div class="results-header">
-                <h2>Routenvorschlaege</h2>
+                <h2>Routenvorschläge</h2>
                 <span class="results-count" id="resultsCount">3 Routen</span>
             </div>
 
@@ -183,6 +241,10 @@
         <button class="map-control-btn" id="zoomToFit" title="Gesamtroute anzeigen">
             <i class="ph ph-arrows-out"></i>
         </button>
+        <button class="map-control-btn active" id="demoModeToggle" title="Demo-Modus deaktivieren"
+            aria-label="Demo-Modus deaktivieren">
+            <i class="ph ph-presentation-chart"></i>
+        </button>
     </div>
 
     <!-- Layer Panel -->
@@ -244,6 +306,18 @@
         </div>
         <p>Routen werden berechnet...</p>
         <span class="loading-sub">Analyse von Verkehr, Umwelt & Infrastruktur</span>
+    </div>
+
+    <div class="app-dialog-overlay" id="appDialogOverlay" style="display:none;">
+        <div class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">
+            <div class="app-dialog-header">
+                <h3 id="appDialogTitle">Hinweis</h3>
+            </div>
+            <div class="app-dialog-body" id="appDialogMessage"></div>
+            <div class="app-dialog-actions">
+                <button class="app-dialog-btn" id="appDialogConfirmBtn" type="button">OK</button>
+            </div>
+        </div>
     </div>
 
     <!-- Authority Login Modal -->
@@ -357,3 +431,4 @@
 </body>
 
 </html>
+

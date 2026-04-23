@@ -41,15 +41,23 @@ function makeCityLookupKeys(input) {
     const plain = clean
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/ß/g, 'ss');
+        .replace(/\u00df/g, 'ss')
+        .replace(/\u00c3\u009f/g, 'ss');
 
-    const digraph = clean
-        .replace(/ä/g, 'ae')
-        .replace(/ö/g, 'oe')
-        .replace(/ü/g, 'ue')
-        .replace(/ß/g, 'ss');
+    const germanDigraph = clean
+        .replace(/\u00e4/g, 'ae')
+        .replace(/\u00f6/g, 'oe')
+        .replace(/\u00fc/g, 'ue')
+        .replace(/\u00df/g, 'ss');
 
-    return [...new Set([clean, plain, digraph])];
+    // Defensive compatibility for legacy mojibake inputs.
+    const mojibakeDigraph = clean
+        .replace(/\u00c3\u00a4/g, 'ae')
+        .replace(/\u00c3\u00b6/g, 'oe')
+        .replace(/\u00c3\u00bc/g, 'ue')
+        .replace(/\u00c3\u009f/g, 'ss');
+
+    return [...new Set([clean, plain, germanDigraph, mojibakeDigraph])];
 }
 
 const CITY_LOOKUP = (() => {
@@ -93,8 +101,8 @@ function applyRouteVisuals(routes) {
 }
 
 function generateRoutes(origin, destination, date, time) {
-    const originCity = resolveCity(origin);
-    const destCity = resolveCity(destination);
+    const originCity = typeof origin === 'string' ? resolveCity(origin) : origin;
+    const destCity = typeof destination === 'string' ? resolveCity(destination) : destination;
 
     if (!originCity || !destCity) return null;
 
@@ -550,10 +558,8 @@ async function fetchRoadRouteVariants(originCity, destCity) {
     const origin = `${originCity.lng},${originCity.lat}`;
     const destination = `${destCity.lng},${destCity.lat}`;
     const viaPoints = [
-        makeViaPoint(0.35, 1, 0.9),
-        makeViaPoint(0.35, -1, 0.9),
-        makeViaPoint(0.65, 1, 0.7),
-        makeViaPoint(0.65, -1, 0.7),
+        makeViaPoint(0.38, 1, 0.85),
+        makeViaPoint(0.38, -1, 0.85),
     ];
     const viaRequests = viaPoints.map(via => `${origin};${via.lng},${via.lat};${destination}`);
 
@@ -651,6 +657,11 @@ const map = L.map('map', {
     attributionControl: true,
 });
 
+map.createPane('poiAreaPane');
+map.getPane('poiAreaPane').style.zIndex = '440';
+map.createPane('poiCenterPane');
+map.getPane('poiCenterPane').style.zIndex = '445';
+
 const tileLayerOptions = {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
     subdomains: 'abcd',
@@ -673,12 +684,22 @@ let selectedRouteId = null;
 let poiMarkers = [];
 let pendingRouteSelectionId = null;
 let selectedVehicleType = 'lkw';
+let isDemoMode = true;
+
+const DEMO_ROUTE_COLOR = '#3b82f6';
 
 const VEHICLE_TOLL_MODEL = {
     // Basis + km-Satz je Fahrzeugklasse.
     lkw: { base: 18.0, perKm: 0.165 },
     transporter: { base: 12.0, perKm: 0.128 },
     bus: { base: 15.0, perKm: 0.145 },
+};
+
+const LKW_FACTOR_TABLE = {
+    weight: { '3.5': 0.82, '7.5': 0.92, '12': 1.0, '18': 1.08 },
+    axles: { '2': 0.9, '3': 0.97, '4': 1.03, '5': 1.1 },
+    emission: { '0': 1.25, '2': 1.18, '3': 1.12, '4': 1.06, '5': 1.0, '6': 0.93 },
+    co2: { '1': 1.12, '2': 1.04, '3': 0.96, '4': 0.9, '5': 0.84 },
 };
 
 // ---- DOM Elements ----
@@ -699,14 +720,137 @@ const sidebar = document.getElementById('sidebar');
 const layerToggleBtn = document.getElementById('layerToggle');
 const layerPanel = document.getElementById('layerPanel');
 const zoomToFitBtn = document.getElementById('zoomToFit');
+const demoModeToggleBtn = document.getElementById('demoModeToggle');
 const mapLegend = document.getElementById('mapLegend');
 const themeToggleBtn = document.getElementById('themeToggle');
 const routeTimeRecommendationEl = document.getElementById('routeTimeRecommendation');
+const appDialogOverlay = document.getElementById('appDialogOverlay');
+const appDialogMessage = document.getElementById('appDialogMessage');
+const appDialogConfirmBtn = document.getElementById('appDialogConfirmBtn');
+const lkwConfigSection = document.getElementById('lkwConfigSection');
+const lkwWeightSelect = document.getElementById('lkwWeight');
+const lkwAxlesSelect = document.getElementById('lkwAxles');
+const lkwEmissionSelect = document.getElementById('lkwEmission');
+const lkwCo2Select = document.getElementById('lkwCo2');
+const lkwBasePriceInput = document.getElementById('lkwBasePrice');
+const lkwTariffValue = document.getElementById('lkwTariffValue');
+const lkwEditToggleBtn = document.getElementById('lkwEditToggle');
+
+let isLkwConfigEditable = false;
+const lkwControls = [lkwWeightSelect, lkwAxlesSelect, lkwEmissionSelect, lkwCo2Select, lkwBasePriceInput];
 
 const activeVehicleChip = document.querySelector('.vehicle-chip.active');
 if (activeVehicleChip?.dataset?.vehicle) {
     selectedVehicleType = activeVehicleChip.dataset.vehicle;
 }
+
+function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function getLkwConfigValues() {
+    const weightKey = String(lkwWeightSelect?.value || '18');
+    const axlesKey = String(lkwAxlesSelect?.value || '5');
+    const emissionKey = String(lkwEmissionSelect?.value || '6');
+    const co2Key = String(lkwCo2Select?.value || '1');
+    const basePriceCent = clampNumber(Number(lkwBasePriceInput?.value || 34.8), 10, 120);
+
+    return {
+        weightKey,
+        axlesKey,
+        emissionKey,
+        co2Key,
+        basePriceCent,
+    };
+}
+
+function applyLkwConfigToVehicleModel() {
+    const cfg = getLkwConfigValues();
+    const weightFactor = LKW_FACTOR_TABLE.weight[cfg.weightKey] || 1;
+    const axleFactor = LKW_FACTOR_TABLE.axles[cfg.axlesKey] || 1;
+    const emissionFactor = LKW_FACTOR_TABLE.emission[cfg.emissionKey] || 1;
+    const co2Factor = LKW_FACTOR_TABLE.co2[cfg.co2Key] || 1;
+
+    const perKmBase = (cfg.basePriceCent / 100) * 0.40;
+    const perKm = perKmBase
+        * weightFactor
+        * axleFactor
+        * (0.75 + emissionFactor * 0.25)
+        * (0.78 + co2Factor * 0.22);
+
+    const base = 18
+        * (0.78 + weightFactor * 0.22)
+        * (0.85 + axleFactor * 0.15)
+        * (0.82 + emissionFactor * 0.18)
+        * (0.84 + co2Factor * 0.16);
+
+    VEHICLE_TOLL_MODEL.lkw = {
+        base: Number(base.toFixed(2)),
+        perKm: Number(perKm.toFixed(3)),
+    };
+}
+
+function updateLkwTariffSummary() {
+    if (!lkwTariffValue) return;
+    const profile = VEHICLE_TOLL_MODEL.lkw;
+    lkwTariffValue.textContent = `${profile.base.toFixed(2)} EUR + ${profile.perKm.toFixed(3)} EUR/km`;
+}
+
+function setLkwConfigEditable(editable) {
+    if (!lkwConfigSection) return;
+    isLkwConfigEditable = Boolean(editable);
+
+    lkwConfigSection.classList.toggle('locked', !isLkwConfigEditable);
+    lkwControls.forEach(control => {
+        if (!control) return;
+        control.disabled = !isLkwConfigEditable;
+    });
+
+    if (!lkwEditToggleBtn) return;
+
+    lkwEditToggleBtn.classList.toggle('active', isLkwConfigEditable);
+    lkwEditToggleBtn.setAttribute('aria-pressed', isLkwConfigEditable ? 'true' : 'false');
+    lkwEditToggleBtn.setAttribute('title', isLkwConfigEditable ? 'Bearbeitung sperren' : 'LKW-Eigenschaften bearbeiten');
+    lkwEditToggleBtn.setAttribute('aria-label', isLkwConfigEditable ? 'Bearbeitung sperren' : 'LKW-Eigenschaften bearbeiten');
+}
+
+function refreshPricingFromVehicleConfig() {
+    applyLkwConfigToVehicleModel();
+    updateLkwTariffSummary();
+
+    if (currentRoutes.length > 0 && travelDate.value && travelTime.value) {
+        recalculateRoutePricing(currentRoutes, travelDate.value, travelTime.value);
+        renderCurrentRouteView();
+    }
+}
+
+function normalizeLkwBasePriceInput() {
+    if (!lkwBasePriceInput) return;
+    const normalized = clampNumber(Number(lkwBasePriceInput.value || 34.8), 10, 120);
+    lkwBasePriceInput.value = normalized.toFixed(1);
+}
+
+function showAppDialog(message) {
+    if (!appDialogOverlay || !appDialogMessage) return;
+    appDialogMessage.textContent = String(message || '');
+    appDialogOverlay.style.display = 'flex';
+    appDialogConfirmBtn?.focus();
+}
+
+function hideAppDialog() {
+    if (!appDialogOverlay) return;
+    appDialogOverlay.style.display = 'none';
+}
+
+appDialogConfirmBtn?.addEventListener('click', hideAppDialog);
+appDialogOverlay?.addEventListener('click', (event) => {
+    if (event.target === appDialogOverlay) hideAppDialog();
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && appDialogOverlay?.style.display !== 'none') {
+        hideAppDialog();
+    }
+});
 
 // ---- Theme ----
 const THEME_STORAGE_KEY = 'ecotoll-theme';
@@ -739,6 +883,72 @@ function setTheme(theme) {
 
 const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
 setTheme(savedTheme || 'dark');
+setLkwConfigEditable(false);
+refreshPricingFromVehicleConfig();
+
+function getFastestRoute(routes) {
+    if (!Array.isArray(routes) || routes.length === 0) return null;
+    return routes.find(route => route.id === 2) || [...routes].sort((a, b) => a.duration - b.duration)[0];
+}
+
+function getDisplayedRoutes(routes = currentRoutes) {
+    if (!Array.isArray(routes) || routes.length === 0) return [];
+    if (!isDemoMode) return routes;
+
+    const fastestRoute = getFastestRoute(routes);
+    if (!fastestRoute) return [];
+
+    return routes
+        .filter(route => route.id === fastestRoute.id)
+        .map(route => ({ ...route, color: DEMO_ROUTE_COLOR }));
+}
+
+function updateDemoModeToggleButton() {
+    if (!demoModeToggleBtn) return;
+
+    const title = isDemoMode ? 'Demo-Modus deaktivieren' : 'Demo-Modus aktivieren';
+    demoModeToggleBtn.classList.toggle('active', isDemoMode);
+    demoModeToggleBtn.setAttribute('title', title);
+    demoModeToggleBtn.setAttribute('aria-label', title);
+}
+
+function renderCurrentRouteView(options = {}) {
+    if (!Array.isArray(currentRoutes) || currentRoutes.length === 0) return;
+
+    const keepDetailPanel = options.keepDetailPanel !== false;
+    const displayedRoutes = getDisplayedRoutes(currentRoutes);
+    if (displayedRoutes.length === 0) return;
+
+    const displayedRouteIds = new Set(displayedRoutes.map(route => route.id));
+    if (selectedRouteId && !displayedRouteIds.has(selectedRouteId)) {
+        selectedRouteId = null;
+    }
+    if (!selectedRouteId) {
+        selectedRouteId = displayedRoutes[0].id;
+    }
+
+    renderRoutes(displayedRoutes);
+    drawRoutesOnMap(displayedRoutes);
+    highlightRoute(selectedRouteId);
+    refreshVisiblePOILayers();
+
+    const selectedRoute = currentRoutes.find(route => route.id === selectedRouteId) || currentRoutes[0];
+    if (travelDate.value && travelTime.value && selectedRoute) {
+        renderTimeSuggestions(originInput.value, destInput.value, travelDate.value, travelTime.value, selectedRoute);
+    }
+
+    if (!keepDetailPanel || routeDetailPanel.style.display === 'none') return;
+
+    if (selectedRoute && displayedRouteIds.has(selectedRoute.id)) {
+        showRouteDetail(selectedRoute);
+        return;
+    }
+
+    routeDetailPanel.style.display = 'none';
+    resultsSection.style.display = 'block';
+}
+
+updateDemoModeToggleButton();
 
 // ---- Event Listeners ----
 
@@ -783,6 +993,13 @@ zoomToFitBtn.addEventListener('click', () => {
     }
 });
 
+// Demo mode toggle
+demoModeToggleBtn.addEventListener('click', () => {
+    isDemoMode = !isDemoMode;
+    updateDemoModeToggleButton();
+    renderCurrentRouteView();
+});
+
 // Back button
 backBtn.addEventListener('click', () => {
     routeDetailPanel.style.display = 'none';
@@ -796,27 +1013,24 @@ document.querySelectorAll('.vehicle-chip').forEach(chip => {
         document.querySelectorAll('.vehicle-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         selectedVehicleType = chip.dataset.vehicle || 'lkw';
-
-        // Keep prices in sync with selected vehicle, even without a new search.
-        if (currentRoutes.length > 0 && travelDate.value && travelTime.value) {
-            recalculateRoutePricing(currentRoutes, travelDate.value, travelTime.value);
-            renderRoutes(currentRoutes);
-            if (selectedRouteId) {
-                highlightRoute(selectedRouteId);
-                const selectedRoute = currentRoutes.find(route => route.id === selectedRouteId);
-                if (selectedRoute) {
-                    showRouteDetail(selectedRoute);
-                    renderTimeSuggestions(originInput.value, destInput.value, travelDate.value, travelTime.value, selectedRoute);
-                }
-            } else {
-                const baseRoute = currentRoutes[0];
-                if (baseRoute) {
-                    renderTimeSuggestions(originInput.value, destInput.value, travelDate.value, travelTime.value, baseRoute);
-                }
-            }
-        }
+        refreshPricingFromVehicleConfig();
     });
 });
+
+lkwEditToggleBtn?.addEventListener('click', () => {
+    setLkwConfigEditable(!isLkwConfigEditable);
+});
+
+[
+    lkwWeightSelect,
+    lkwAxlesSelect,
+    lkwEmissionSelect,
+    lkwCo2Select,
+].forEach(control => {
+    control?.addEventListener('change', refreshPricingFromVehicleConfig);
+});
+
+lkwBasePriceInput?.addEventListener('input', refreshPricingFromVehicleConfig);
 
 // Layer toggles
 document.querySelectorAll('.layer-toggle input').forEach(input => {
@@ -833,20 +1047,22 @@ destInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSea
 async function handleSearch() {
     const origin = originInput.value.trim();
     const destination = destInput.value.trim();
-    const date = travelDate.value;
-    const time = travelTime.value;
+    const date = travelDate.value || '2026-04-22';
+    const time = travelTime.value || '08:00';
+    travelDate.value = date;
+    travelTime.value = time;
     const originCity = resolveCity(origin);
     const destCity = resolveCity(destination);
 
     if (!originCity || !destCity) {
         shakeElement(origin ? destInput : originInput);
         const availableCities = [...new Set(Object.values(CITY_LOOKUP).map(city => city.name))].join(', ');
-        alert(`Stadt nicht gefunden. Verfügbare Städte: ${availableCities}`);
+        showAppDialog(`Stadt nicht gefunden.\nVerfügbare Städte: ${availableCities}`);
         return;
     } // Modern Interface: show skeleton loading instead of blocking overlay
     resultsSection.style.display = 'block';
     routeDetailPanel.style.display = 'none';
-    
+
     // Clear map slightly for transition effect
     routeLayers.forEach(l => map.removeLayer(l));
     markerLayers.forEach(l => map.removeLayer(l));
@@ -886,18 +1102,17 @@ async function handleSearch() {
                 loadStep++;
             }, 150);
         }
-    }, 400);
+    }, 300);
 
-    const routes = generateRoutes(origin, destination, date, time);
+    const routes = generateRoutes(originCity, destCity, date, time);
     if (!routes) {
         clearInterval(loadingInterval);
+        showAppDialog('Routen konnten nicht berechnet werden. Bitte Start/Ziel erneut prüfen.');
         return;
     }
 
     await applyRoadGeometryToRoutes(routes, originCity, destCity, date, time);
-    
-    // Artificial small delay to let the user read the satisfying loading steps
-    await new Promise(resolve => setTimeout(resolve, 1400));
+
     clearInterval(loadingInterval);
 
     // Synchronize POIs with the text descriptions for all routes
@@ -905,22 +1120,15 @@ async function handleSearch() {
 
     selectedRouteId = null;
     currentRoutes = routes;
-    renderRoutes(routes);
-    drawRoutesOnMap(routes);
-
     if (pendingRouteSelectionId) {
         const routeExists = routes.some(route => route.id === pendingRouteSelectionId);
         if (routeExists) {
             selectedRouteId = pendingRouteSelectionId;
-            renderRoutes(routes);
-            highlightRoute(selectedRouteId);
         }
         pendingRouteSelectionId = null;
     }
 
-    refreshVisiblePOILayers();
-    const routeForSuggestions = routes.find(route => route.id === selectedRouteId) || routes[0];
-    renderTimeSuggestions(origin, destination, date, time, routeForSuggestions);
+    renderCurrentRouteView({ keepDetailPanel: false });
     renderTrafficHeatmap(date);
     resultsSection.style.display = 'block';
     routeDetailPanel.style.display = 'none';
@@ -1062,11 +1270,15 @@ function showRouteDetail(route) {
             `).join('')}
         </div>
 
-        <button class="book-btn" onclick="alert('Route wurde ausgewählt! In der Vollversion wird die Navigation gestartet.')">
+        <button class="book-btn" onclick="openRouteSelectionDialog()">
             <i class="ph ph-navigation-arrow"></i>
             Route wählen & Navigation starten
         </button>
     `;
+}
+
+function openRouteSelectionDialog() {
+    showAppDialog('Route wurde ausgewählt! In der Vollversion wird die Navigation gestartet.');
 }
 
 function renderCriterionCard(icon, label, criterion) {
@@ -1125,17 +1337,29 @@ function drawRoutesOnMap(routes) {
             dashArray: route.id === 3 ? '8, 8' : null,
         }).addTo(map);
 
+        if (!isDemoMode) {
+            let vIcon = 'ph-truck';
+            if (selectedVehicleType === 'transporter') vIcon = 'ph-van';
+            if (selectedVehicleType === 'bus') vIcon = 'ph-bus';
+
+            const yOffset = route.id === 1 ? -36 : (route.id === 2 ? 0 : 36);
+            line.bindTooltip(`<div class="route-hover-tooltip" style="display:flex; align-items:center; gap:4px;"><i class="ph ${vIcon}"></i> ${route.adjustedToll} &euro;</div>`, {
+                permanent: true,
+                className: 'custom-leaflet-tooltip',
+                direction: 'center',
+                offset: [0, yOffset]
+            });
+        }
+
         line.routeId = route.id;
         line.on('click', () => selectRoute(route.id));
         line.on('mouseover', () => {
             line.setStyle({ weight: 6, opacity: 1 });
             shadowLine.setStyle({ weight: 14, opacity: 0.25 });
+            if (line.getTooltip()) line.getTooltip().setOpacity(1);
         });
         line.on('mouseout', () => {
-            if (selectedRouteId !== route.id) {
-                line.setStyle({ weight: 4, opacity: 0.8 });
-                shadowLine.setStyle({ weight: 10, opacity: 0.15 });
-            }
+            highlightRoute(selectedRouteId);
         });
 
         routeLayers.push(line, shadowLine);
@@ -1199,10 +1423,13 @@ function highlightRoute(routeId) {
             if (routeId && layer.routeId === routeId) {
                 layer.setStyle({ weight: 6, opacity: 1 });
                 layer.bringToFront();
+                if (layer.getTooltip()) layer.getTooltip().setOpacity(1);
             } else if (routeId && layer.routeId !== routeId) {
                 layer.setStyle({ weight: 3, opacity: 0.3 });
+                if (layer.getTooltip()) layer.getTooltip().setOpacity(0);
             } else {
                 layer.setStyle({ weight: 4, opacity: 0.8 });
+                if (layer.getTooltip()) layer.getTooltip().setOpacity(1);
             }
         } else {
             // Shadow layers
@@ -1299,7 +1526,7 @@ function togglePOILayer(layerType, visible) {
             map.removeLayer(m.marker);
         });
         poiMarkers = poiMarkers.filter(m => m.layerType !== layerType);
-        
+
         if (layerType === 'accidents' && accidentClusterLayer) {
             map.removeLayer(accidentClusterLayer);
         }
@@ -1313,39 +1540,71 @@ function togglePOILayer(layerType, visible) {
     const activeRoute = getActiveRouteForLayers();
     if (!activeRoute || !activeRoute.pois || !activeRoute.pois[layerType]) return;
 
+    const areaLayerMeta = {
+        traffic: { label: 'Verkehrsdichte', icon: 'ph-traffic-signal', dash: '12, 8' },
+        noise: { label: 'Lärm', icon: 'ph-speaker-high', dash: '4, 9' },
+        air: { label: 'Luftqualität', icon: 'ph-wind', dash: '2, 10' },
+    };
+
     activeRoute.pois[layerType].forEach(poi => {
         let marker;
         if (poi.shape === 'area') {
+            const meta = areaLayerMeta[layerType] || { label: 'Umweltzone', icon: 'ph-circle', dash: '8, 8' };
             const group = L.featureGroup();
-            
-            // Soft outer bounding ring
+
+            // Wider halo to make the zone visible on both dark/light maps.
             L.circle(poi.latlng, {
-                radius: poi.radius * 1.6,
+                pane: 'poiAreaPane',
+                radius: poi.radius * 1.8,
                 fillColor: poi.color,
-                fillOpacity: 0.05,
-                color: 'transparent',
-                weight: 0
+                fillOpacity: 0.11,
+                color: poi.color,
+                opacity: 0.26,
+                weight: 1,
+                interactive: false,
             }).addTo(group);
-            
-            // Main area ring
+
+            // Main zone body with stronger stroke contrast.
             L.circle(poi.latlng, {
+                pane: 'poiAreaPane',
                 radius: poi.radius,
                 fillColor: poi.color,
-                fillOpacity: 0.15,
-                color: poi.color,
-                weight: 2,
-                opacity: 0.4,
-                dashArray: '6, 8'
+                fillOpacity: 0.24,
+                color: '#ffffff',
+                weight: 2.2,
+                opacity: 0.88,
+                dashArray: meta.dash,
+                interactive: false,
             }).addTo(group);
-            
-            // Solid inner core
+
+            // Pulse core keeps the center focus easy to scan.
             L.circle(poi.latlng, {
+                pane: 'poiAreaPane',
                 radius: poi.radius * 0.35,
                 fillColor: poi.color,
-                fillOpacity: 0.4,
+                fillOpacity: 0.42,
                 color: 'transparent',
                 weight: 0,
-                className: (poi.color === '#ef4444' || poi.color === '#dc2626') ? 'pulsating-core' : ''
+                className: 'pulsating-core',
+                interactive: false,
+            }).addTo(group);
+
+            L.circleMarker(poi.latlng, {
+                pane: 'poiCenterPane',
+                radius: 12,
+                fillOpacity: 0,
+                color: poi.color,
+                weight: 2.6,
+                opacity: 0.8,
+            }).addTo(group);
+
+            L.circleMarker(poi.latlng, {
+                pane: 'poiCenterPane',
+                radius: 7,
+                fillColor: poi.color,
+                fillOpacity: 0.95,
+                color: '#ffffff',
+                weight: 2,
             }).addTo(group);
 
             marker = group;
@@ -1363,7 +1622,16 @@ function togglePOILayer(layerType, visible) {
             });
         }
 
-        marker.addTo(map).bindPopup(`<div class="popup-title">${poi.label}</div><div class="popup-info">${poi.info}</div>`);
+        const layerInfo = areaLayerMeta[layerType];
+        const popupLayerBadge = layerInfo
+            ? `<div class="layer-popup-badge layer-popup-${layerType}"><i class="ph ${layerInfo.icon}"></i>${layerInfo.label}</div>`
+            : '';
+
+        marker.addTo(map).bindPopup(`
+            <div class="popup-title">${poi.label}</div>
+            <div class="popup-info">${poi.info}</div>
+            ${popupLayerBadge}
+        `);
         poiMarkers.push({ marker, layerType });
     });
 }
@@ -1386,9 +1654,9 @@ async function toggleAccidentLayer(visible) {
     // Load GeoJSON data
     if (!accidentDataCache) {
         try {
-            const cities = ['berlin', 'dortmund', 'kassel'];
+            const cities = ['berlin', 'dortmund', 'kassel', 'hamburg', 'muenchen', 'hannover'];
             accidentDataCache = { type: 'FeatureCollection', features: [] };
-            
+
             await Promise.all(cities.map(async (city) => {
                 try {
                     const resp = await fetch(`Daten/geojson/unfaelle_${city}.json`);
@@ -1400,7 +1668,7 @@ async function toggleAccidentLayer(visible) {
                     console.warn(`Failed to fetch accident data for ${city}`, err);
                 }
             }));
-            
+
         } catch (e) {
             console.error('Failed to load accident data:', e);
             return;
@@ -1423,7 +1691,7 @@ async function toggleAccidentLayer(visible) {
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
         zoomToBoundsOnClick: true,
-        iconCreateFunction: function(cluster) {
+        iconCreateFunction: function (cluster) {
             const count = cluster.getChildCount();
             let size = 'small';
             let s = 30;
@@ -1520,7 +1788,7 @@ function generateSynchronizedPOIs(routes) {
         const trCount = trafficSeverity === 'high' ? 3 : (trafficSeverity === 'moderate' ? 2 : 1);
         const trafficColor = trafficSeverity === 'high' ? '#ef4444' : (trafficSeverity === 'moderate' ? '#f59e0b' : '#22c55e');
         const trafficRadius = trafficSeverity === 'high' ? 9500 : (trafficSeverity === 'moderate' ? 6500 : 4500);
-        const trafficInfo = trafficSeverity === 'high' ? 'Dichte Verkehrsstr-me / Stop-and-Go' : (trafficSeverity === 'moderate' ? 'M-ige Verkehrsdichte' : 'Fl-ssiger Verkehr');
+        const trafficInfo = trafficSeverity === 'high' ? 'Dichte Verkehrsströme / Stop-and-Go' : (trafficSeverity === 'moderate' ? 'M-ige Verkehrsdichte' : 'Fl-ssiger Verkehr');
         for (let i = 0; i < trCount; i++) {
             route.pois.traffic.push({ latlng: getRandomWaypoint(), shape: 'area', radius: trafficRadius, label: 'Verkehrsdichte-Zone', info: trafficInfo, color: trafficColor });
         }
@@ -1548,9 +1816,9 @@ function generateSynchronizedPOIs(routes) {
 // Traffic Density Profiles
 const TRAFFIC_PROFILES = {
     weekday: [10, 5, 5, 5, 8, 25, 65, 90, 95, 70, 50, 45, 50, 55, 60, 75, 90, 95, 80, 55, 35, 25, 18, 12],
-    friday:  [10, 5, 5, 5, 8, 20, 55, 85, 90, 65, 50, 50, 60, 70, 80, 95, 98, 90, 75, 50, 30, 20, 15, 10],
-    saturday:[8, 5, 5, 5, 5, 8, 15, 25, 40, 55, 65, 70, 68, 65, 60, 55, 50, 45, 35, 25, 20, 15, 12, 10],
-    sunday:  [8, 5, 5, 5, 5, 5, 10, 15, 25, 35, 40, 45, 50, 55, 60, 70, 75, 70, 55, 40, 30, 20, 15, 10],
+    friday: [10, 5, 5, 5, 8, 20, 55, 85, 90, 65, 50, 50, 60, 70, 80, 95, 98, 90, 75, 50, 30, 20, 15, 10],
+    saturday: [8, 5, 5, 5, 5, 8, 15, 25, 40, 55, 65, 70, 68, 65, 60, 55, 50, 45, 35, 25, 20, 15, 12, 10],
+    sunday: [8, 5, 5, 5, 5, 5, 10, 15, 25, 35, 40, 45, 50, 55, 60, 70, 75, 70, 55, 40, 30, 20, 15, 10],
 };
 
 const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
@@ -1859,7 +2127,7 @@ function renderTimeSuggestions(origin, destination, date, currentTime, bestRoute
                     <div class="time-slot-datetime">
                         <span class="time-slot-time">${timeStr}</span>
                         <span class="time-slot-day">${dayLabel}</span>
-                        ${isBest ? '<span class="time-slot-tag best">Beste Zeit</span>' : (slot.density < 30 ? '<span class="time-slot-tag good">Empfohlen</span>' : '') }
+                        ${isBest ? '<span class="time-slot-tag best">Beste Zeit</span>' : (slot.density < 30 ? '<span class="time-slot-tag good">Empfohlen</span>' : '')}
                     </div>
                     <div class="time-slot-details">
                         <span class="time-slot-traffic">
@@ -1943,14 +2211,14 @@ function renderHeatmapBars(dayType, date) {
         const traffic = getTrafficLevel(density);
         const tollMultiplier = getTollMultiplier(density);
         const isCurrentHour = isToday && hour === currentHour;
-        const tollLabel = tollMultiplier < 1 ? `${Math.round((1-tollMultiplier)*100)}% Rabatt` : 
-                          tollMultiplier > 1 ? `+${Math.round((tollMultiplier-1)*100)}% Aufschlag` : 'Normal';
+        const tollLabel = tollMultiplier < 1 ? `${Math.round((1 - tollMultiplier) * 100)}% Rabatt` :
+            tollMultiplier > 1 ? `+${Math.round((tollMultiplier - 1) * 100)}% Aufschlag` : 'Normal';
 
         // Show every other hour label to save space
         const showLabel = hour % 2 === 0;
 
         return `
-            <div class="heatmap-bar-wrapper" onclick="applyTimeSuggestion('${date}', '${hour.toString().padStart(2,'0')}:00')">
+            <div class="heatmap-bar-wrapper" onclick="applyTimeSuggestion('${date}', '${hour.toString().padStart(2, '0')}:00')">
                 <div class="heatmap-tooltip">
                     <strong>${hour}:00</strong> - ${traffic.label}<br>
                     Dichte: ${density}% · ${tollLabel}
@@ -2014,12 +2282,12 @@ const QUARTERS = [
 
 const QUARTER_SEASONAL = {
     1: { density: -8, accidents: -0.05 },
-    2: { density:  4, accidents:  0.02 },
-    3: { density: 10, accidents:  0.08 },
-    4: { density: -2, accidents:  0.00 },
+    2: { density: 4, accidents: 0.02 },
+    3: { density: 10, accidents: 0.08 },
+    4: { density: -2, accidents: 0.00 },
 };
 
-const AUTHORITY_REAL_DATA_CITIES = ['berlin', 'dortmund', 'kassel'];
+const AUTHORITY_REAL_DATA_CITIES = ['berlin', 'dortmund', 'kassel', 'hamburg', 'muenchen', 'hannover'];
 const _authorityAccidentCache = new Map();
 
 let isAuthorityLoggedIn = false;
@@ -2141,7 +2409,7 @@ async function getAuthorityStats(cityKey, quarterId) {
         return Math.max(15, Math.min(95, density + authorityRandInt(rng, -6, 6)));
     });
 
-    const MONTH_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
     return {
         city: cityKey,
@@ -2211,7 +2479,7 @@ const RECOMMENDATION_RULES = [
         badge: 'Erfolg',
         condition: function (p, c) {
             return authorityPctChange(p.density, c.density) <= -10 &&
-                   authorityPctChange(p.accidents, c.accidents) <= -8;
+                authorityPctChange(p.accidents, c.accidents) <= -8;
         },
         reason: function (p, c) {
             return 'Verkehr ' + formatSigned(authorityPctChange(p.density, c.density)) +
@@ -2230,7 +2498,7 @@ const RECOMMENDATION_RULES = [
         badge: 'Tarif-Anpassung',
         condition: function (p, c) {
             return authorityPctChange(p.density, c.density) >= 8 &&
-                   authorityPctChange(p.accidents, c.accidents) >= 10;
+                authorityPctChange(p.accidents, c.accidents) >= 10;
         },
         reason: function (p, c) {
             return 'Verkehr stieg um ' + authorityPctChange(p.density, c.density).toFixed(1) +
@@ -2347,14 +2615,14 @@ function handleAuthorityLogin() {
         return;
     }
     isAuthorityLoggedIn = true;
-    try { sessionStorage.setItem(AUTHORITY_STORAGE_KEY, '1'); } catch (_) {}
+    try { sessionStorage.setItem(AUTHORITY_STORAGE_KEY, '1'); } catch (_) { }
     closeAuthorityLogin();
     openAuthorityDashboard();
 }
 
 function logoutAuthority() {
     isAuthorityLoggedIn = false;
-    try { sessionStorage.removeItem(AUTHORITY_STORAGE_KEY); } catch (_) {}
+    try { sessionStorage.removeItem(AUTHORITY_STORAGE_KEY); } catch (_) { }
     closeAuthorityDashboard();
 }
 
@@ -2592,5 +2860,6 @@ function renderAuthorityRecommendations(recs) {
         if (sessionStorage.getItem(AUTHORITY_STORAGE_KEY) === '1') {
             isAuthorityLoggedIn = true;
         }
-    } catch (_) {}
+    } catch (_) { }
 })();
+

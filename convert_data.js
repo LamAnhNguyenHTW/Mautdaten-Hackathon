@@ -11,7 +11,10 @@ const WGS84 = '+proj=longlat +datum=WGS84 +no_defs';
 const BBOXES = {
     berlin: { minLng: 13.05, maxLng: 13.78, minLat: 52.33, maxLat: 52.69 },
     dortmund: { minLng: 7.20, maxLng: 7.70, minLat: 51.40, maxLat: 51.65 },
-    kassel: { minLng: 9.35, maxLng: 9.60, minLat: 51.25, maxLat: 51.40 }
+    kassel: { minLng: 9.35, maxLng: 9.60, minLat: 51.25, maxLat: 51.40 },
+    hamburg: { minLng: 9.70, maxLng: 10.30, minLat: 53.40, maxLat: 53.75 },
+    muenchen: { minLng: 11.36, maxLng: 11.72, minLat: 48.06, maxLat: 48.25 },
+    hannover: { minLng: 9.62, maxLng: 9.94, minLat: 52.31, maxLat: 52.48 }
 };
 
 const OUT_DIR = path.join(__dirname, 'daten', 'geojson');
@@ -51,7 +54,7 @@ function convertUnfallorte() {
     const iKRAD = header.indexOf('IstKrad');
     const iGKFZ = header.indexOf('IstGkfz');
     
-    const featuresByCity = { berlin: [], dortmund: [], kassel: [] };
+    const featuresByCity = { berlin: [], dortmund: [], kassel: [], hamburg: [], muenchen: [], hannover: [] };
     let skipped = 0;
     
     for (let i = 1; i < lines.length; i++) {
